@@ -1,60 +1,64 @@
 import { Link } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-
-import '../App.css'
+import '../App.css';
 
 function Maindisplay() {
     const [books, setBooks] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1); 
+    const [totalPages, setTotalPages] = useState(1);  
 
     useEffect(() => {
-        axios.get('http://localhost:8000/api/books')
+        axios.get(`http://localhost:8000/api/books?page=${currentPage}`)
             .then(res => {
-                console.log('Books data:', res.data.books);
-                setBooks(res.data.books);
+                if (res.data.status === 200) {
+                    setBooks(res.data.books.data); 
+                    setTotalPages(res.data.books.last_page); 
+                } else {
+                    console.log('No books found.');
+                }
             })
             .catch(error => {
-                if (error.response) {
-                    if (error.response.status === 404) {
-                        console.log('No books found.');
-                    } else {
-                        console.log('An error occurred while fetching books.');
-                    }
-                } else {
-                    console.log('An error occurred while fetching books.');
-                }
+                console.log('Error fetching books:', error);
             });
-    }, []);
+    }, [currentPage]);
+
+    const handleSearchChange = (e) => {
+        setSearchTerm(e.target.value);
+    };
 
     const deleteBook = (e, id) => {
         e.preventDefault();
-    
         const thisClicked = e.currentTarget;
         thisClicked.innerText = 'Deleting...';
-    
+
         axios.delete(`http://localhost:8000/api/books/${id}/delete`)
             .then(res => {
-                alert(res.data.message);
-                thisClicked.closest('.table-handler').remove();
-            })
-            .catch(function (error) {
-                if (error.response) {
-                    if (error.response.status === 404) {
-                        alert(`The book with id ${id} was not found.`);
-                        thisClicked.innerText = 'Delete';
-                    }
-                    if (error.response.status === 500) {
-                        alert('An error occurred while deleting the book.');
-                    }
+                if (res.data.status === 200) {
+                    alert(res.data.message);
+                    setBooks(books.filter(book => book.id !== id)); 
                 } else {
-                    alert('An error occurred while deleting the book.');
+                    thisClicked.innerText = 'Delete';
+                    alert('Error: ' + res.data.message);
                 }
+            })
+            .catch(err => {
                 thisClicked.innerText = 'Delete';
+                console.log('Error deleting book:', err);
             });
     };
-    const handleSearchChange = (e) => {
-        setSearchTerm(e.target.value);
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
+    };
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
     };
 
     const filteredBooks = books.filter(book =>
@@ -63,42 +67,6 @@ function Maindisplay() {
         book.publisher.toLowerCase().includes(searchTerm.toLowerCase()) ||
         book.format.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
-    const bookDetails = filteredBooks.map((item, index) => {
-        const imageUrl = item.image ? `http://localhost:8000/storage/${item.image}` : ''; 
-
-        return (
-            <tr key={index}>
-                <td className='table-handler container'>
-                    <div>
-                        <Link to={`/${item.id}/view`} className='book-title'>
-                            <h3>{item.title}</h3>
-                        </Link>
-                    </div>
-                    <div className='background d-flex justify-content-between align-items-center'>
-                        <div style={{ width: '300px', height: 'auto', objectFit: 'contain'}}>
-                            {imageUrl && <img src={imageUrl} alt={item.title} style={{ width: '200px', height: 'auto', objectFit: 'contain' }} />} 
-                        </div>
-                        <div>
-                            <div className='d-flex flex-column justify-content-center'>
-                                <div className='d-flex padding-author pt-2'><span className='fw-bold'>Author:</span> <span>{item.author}</span></div>
-                                <div className='d-flex padding-author'><span className='fw-bold'>Published:</span> {item.published}</div>
-                                <div className='d-flex padding-author'><span className='fw-bold'>Publisher:</span> {item.publisher}</div>
-                                <div className='d-flex padding-author'><span className='fw-bold'>Format:</span> {item.format}</div>
-                                <div className='d-flex padding-author'><span className='fw-bold'>ISBN 13:</span> {item.random_number_13}</div>
-                                <div className='d-flex padding-author'><span className='fw-bold'>ISBN 10:</span> {item.random_number_10}</div>
-                                <div className='d-flex justify-content-end mt-5 mb-2'>
-                                    <Link to={`/${item.id}/edit`} className='btn btn-success me-2 custom-width'>Edit</Link>
-                                    <button type='button' onClick={(e) => deleteBook(e, item.id)} className='btn btn-danger custom-width'>Delete</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-
-        );
-    });
 
     return (
         <div className='rent-a-book-container container-fluid'>
@@ -122,9 +90,62 @@ function Maindisplay() {
                                 <div className="table-responsive">
                                     <table className="table">
                                         <tbody>
-                                            {bookDetails}
+                                            {filteredBooks.length > 0 ? (
+                                                filteredBooks.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td className='table-handler container'>
+                                                            <div>
+                                                                <Link to={`/${item.id}/view`} className='book-title'>
+                                                                    <h3>{item.title}</h3>
+                                                                </Link>
+                                                            </div>
+                                                            <div className='background d-flex justify-content-between align-items-center'>
+                                                                <div style={{ width: '300px', height: 'auto', objectFit: 'contain' }}>
+                                                                    {item.image && <img src={`http://localhost:8000/storage/${item.image}`} alt={item.title} style={{ width: '200px', height: 'auto', objectFit: 'contain' }} />}
+                                                                </div>
+                                                                <div>
+                                                                    <div className='d-flex flex-column justify-content-center'>
+                                                                        <div className='d-flex padding-author pt-2'><span className='fw-bold'>Author:</span> <span>{item.author}</span></div>
+                                                                        <div className='d-flex padding-author'><span className='fw-bold'>Published:</span> {item.published}</div>
+                                                                        <div className='d-flex padding-author'><span className='fw-bold'>Publisher:</span> {item.publisher}</div>
+                                                                        <div className='d-flex padding-author'><span className='fw-bold'>Format:</span> {item.format}</div>
+                                                                        <div className='d-flex padding-author'><span className='fw-bold'>ISBN 13:</span> {item.random_number_13}</div>
+                                                                        <div className='d-flex padding-author'><span className='fw-bold'>ISBN 10:</span> {item.random_number_10}</div>
+                                                                        <div className='d-flex justify-content-end mt-5 mb-2'>
+                                                                            <Link to={`/${item.id}/edit`} className='btn btn-success me-2 custom-width'>Edit</Link>
+                                                                            <button type='button' onClick={(e) => deleteBook(e, item.id)} className='btn btn-danger custom-width'>Delete</button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="5">No books found.</td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
+                                </div>
+
+                                <div className="pagination-controls">
+                                    <button
+                                        onClick={handlePreviousPage}
+                                        disabled={currentPage === 1}
+                                        className="btn btn-secondary me-2"
+                                    >
+                                        Previous
+                                    </button>
+                                    <span>Page {currentPage} of {totalPages}</span>
+                                    <button
+                                        onClick={handleNextPage}
+                                        disabled={currentPage === totalPages}
+                                        className="btn btn-secondary ms-2"
+                                    >
+                                        Next
+                                    </button>
                                 </div>
                             </div>
                         </div>
