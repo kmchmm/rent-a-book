@@ -26,6 +26,7 @@ function Bookedit() {
       try {
         const response = await axios.get(`http://localhost:8000/api/books/${id}/edit`);
         const bookData = response.data.book || {};
+  
         setBooks({
           author: bookData.author || '',
           published: bookData.published || '',
@@ -34,8 +35,9 @@ function Bookedit() {
           title: bookData.title || '',
           random_number_13: bookData.random_number_13 || '',
           random_number_10: bookData.random_number_10 || '',
-          image: null,
+          image: null, 
         });
+  
         setCurrentImage(bookData.image ? `http://localhost:8000/storage/${bookData.image}` : null);
       } catch (error) {
         if (error.response && error.response.status === 404) {
@@ -46,33 +48,27 @@ function Bookedit() {
         }
       }
     };
-
+  
     fetchBookData();
   }, [id]);
 
   const handleInput = async (e) => {
     const { name, value, files } = e.target;
+  
     if (name === 'image' && files[0]) {
-      try {
-        const formData = new FormData();
-        formData.append('image', files[0]);
-
-        const uploadResponse = await axios.post('http://localhost:8000/api/upload-image', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
+      const reader = new FileReader();
+      reader.onloadend = () => {
 
         setBooks(prevBooks => ({
           ...prevBooks,
-          image: uploadResponse.data.imageUrl, 
+          image: reader.result,
         }));
-        setCurrentImage(uploadResponse.data.imageUrl);
+      };
+      reader.readAsDataURL(files[0]);
+  
 
-      } catch (err) {
-        console.error('Error uploading image:', err);
-        alert('Failed to upload image');
-      }
+      const objectUrl = URL.createObjectURL(files[0]);
+      setCurrentImage(objectUrl);  
     } else {
       setBooks(prevBooks => ({
         ...prevBooks,
@@ -86,26 +82,24 @@ function Bookedit() {
     setLoading(true);
   
     try {
-      let imageUrl = null;
+      let imageUrl = currentImage; 
   
-      if (books.image && typeof books.image === 'object') { 
-        const formData = new FormData();
-        formData.append('image', books.image);
-  
-        const uploadResponse = await axios.post('http://localhost:8000/api/upload-image', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-  
-        imageUrl = uploadResponse.data.imagePath;
+      if (books.image && typeof books.image === 'string') {
+        imageUrl = books.image;  
       } else {
+
         imageUrl = currentImage ? currentImage.split('/storage/')[1] : null;
       }
   
       const bookData = {
-        ...books,
-        image: imageUrl,
+        author: books.author,
+        published: books.published,
+        publisher: books.publisher,
+        format: books.format,
+        title: books.title,
+        random_number_13: books.random_number_13,
+        random_number_10: books.random_number_10,
+        ...(books.image && { image: imageUrl }), 
       };
   
       const response = await axios.put(`http://localhost:8000/api/books/${id}/edit`, bookData, {
